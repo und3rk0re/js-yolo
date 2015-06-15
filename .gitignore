@@ -1,0 +1,12 @@
+
+# IDE
+.idea/
+
+# JS
+node_modules/
+npm-debug.log
+*.nar
+
+# Caches
+cache/*
+!cache/.gitkeep
