@@ -12,7 +12,8 @@
     "cheerio": "^0.19.0",
     "iconv": "^2.1.8",
     "promise": "^7.0.1",
-    "request": "^2.57.0"
+    "request": "^2.57.0",
+    "sgwin" : "^0.1.0"
   },
   "devDependencies": {
     "nar": "^0.3.20"

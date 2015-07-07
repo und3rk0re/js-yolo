@@ -1,11 +1,12 @@
 "use strict";
 
 // Includes
-var request = require("request"),
-    Request = require("./HttpModels").Request,
-    Response = require("./HttpModels").Response,
-    Promise = require("promise"),
-    fs = require("fs");
+var request = require("request")
+    , Log = require("sgwin").with("transport")
+    , Request = require("./HttpModels").Request
+    , Response = require("./HttpModels").Response
+    , Promise = require("promise")
+    , fs = require("fs");
 
 
 /**
@@ -35,7 +36,7 @@ var defaultHeader = function defaultHeader(headers, name, value) {
 var HttpTransport = function HttpTransport(options)
 {
     options = options || {};
-    this.log = options.log && typeof options.log === "function" ? options.log : function () {};
+    this.log = Log.with("httptr");
 };
 
 /**
@@ -47,7 +48,7 @@ var HttpTransport = function HttpTransport(options)
 HttpTransport.prototype.send = function send(req)
 {
     if (typeof req === "string") {
-        this.log("Folding " + req + " info GET request");
+        this.log.info("Folding :req info GET request", {req: req});
         req = new Request({uri: req});
     }
 
@@ -68,17 +69,19 @@ HttpTransport.prototype.send = function send(req)
 
     // Sending request
     var date = new Date(), that = this;
-    this.log("Sending " + options.method + " " + options.url);
+
+    this.log.out("Sending :method :url", {method: options.method, url: options.url});
 
     return new Promise(function (resolve, reject) {
         request(options, function(error, response, body) {
             if (error) {
-                that.log("HTTP error " + error);
+                that.log.fail("HTTP error :error", {error: error});
                 reject(error);
             } else {
-                that.log("HTTP success");
+                var delta = new Date().getTime() - date.getTime();
+                that.log.in("HTTP success with code :code in :time sec", {code: response.statusCode, time: delta/1000});
                 var resp = new Response({
-                    time: new Date().getTime() - date.getTime(),
+                    time: delta,
                     request: req,
                     status: response.statusCode,
                     headers: response.headers,
@@ -103,7 +106,7 @@ var FileCachedTransport = function FileCachedTransport(options)
     }
 
     this.transport = options.transport || new HttpTransport(options);
-    this.log = options.log && typeof options.log === "function" ? options.log : function () {};
+    this.log = Log.with("httpfctr");
 };
 
 /**
@@ -124,17 +127,17 @@ FileCachedTransport.prototype.getCacheFilename = function getCacheFilename(req)
 FileCachedTransport.prototype.send = function send(req)
 {
     if (typeof req === "string") {
-        this.log("Folding " + req + " info GET request");
+        this.log.info("Folding :req info GET request", {req: req});
         req = new Request({uri: req});
     }
 
-    this.log("Cache enabled in folder " + this.cacheFolder);
+    this.log.info("Cache enabled in :folder", {folder: this.cacheFolder});
     var that = this;
 
     return new Promise(function (resolve, reject) {
         fs.exists(that.getCacheFilename(req), function existsCheck(result) {
             if (!result) {
-                that.log("Not exists " + that.getCacheFilename(req));
+                that.log.info("Cache entry :name not found ", {name: that.getCacheFilename(req)});
                 that.transport.send(req).done(
                     function(x) {
                         // Storing to file cache
@@ -144,9 +147,9 @@ FileCachedTransport.prototype.send = function send(req)
                                 JSON.stringify(x.exportJson()),
                                 function (err) {
                                     if (err) {
-                                        that.log("Failed to store " + that.getCacheFilename(req) + " " + err);
+                                        that.log.fail("Failed to cache :name :error", {name: that.getCacheFilename(req), error: err});
                                     } else {
-                                        that.log("Cached " + that.getCacheFilename(req));
+                                        that.log.info("Cached :name", {name: that.getCacheFilename(req)});
                                     }
                                 }
                             );
@@ -158,17 +161,17 @@ FileCachedTransport.prototype.send = function send(req)
                     function(x) {reject(x)}
                 );
             } else {
-                that.log("Exists " + that.getCacheFilename(req));
+                that.log.success("Cache entry :name exists, using it", {name: that.getCacheFilename(req)});
                 fs.readFile(that.getCacheFilename(req), function(err, data) {
                     if (err) {
-                        that.log("Error " + err);
+                        that.log.fail("Error reading :name :error", {name: that.getCacheFilename(req), error: err});
                         reject(err);
                     } else {
                         try {
                             resolve(new Response(JSON.parse(data)));
-                            that.log("Cache read success");
+                            that.log.info("Cache read success");
                         } catch (e) {
-                            that.log("JSON parse error " + e);
+                            that.log.fail(e);
                             reject(e);
                         }
                     }
